@@ -173,12 +173,15 @@ def install_extension_from_index(url, hide_tags):
 def refresh_available_extensions(url, hide_tags):
     global available_extensions
 
-    import urllib.request
+    """ import urllib.request
     with urllib.request.urlopen(url) as response:
         text = response.read()
 
-    available_extensions = json.loads(text)
+    available_extensions = json.loads(text) """
 
+    with open('Extensions-index.json', 'r', encoding='utf-8') as f:
+        available_extensions = json.load(f)
+    
     code, tags = refresh_available_extensions_from_data(hide_tags)
 
     return url, code, gr.CheckboxGroup.update(choices=tags), ''
