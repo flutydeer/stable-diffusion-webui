@@ -96,13 +96,18 @@ class FrozenCLIPEmbedderWithCustomWordsBase(torch.nn.Module):
         token_count = 0
         last_comma = -1
 
-        def next_chunk():
-            """puts current chunk into the list of results and produces the next one - empty"""
+        def next_chunk(is_last=False):
+            """puts current chunk into the list of results and produces the next one - empty;
+            if is_last is true, tokens <end-of-text> tokens at the end won't add to token_count"""
             nonlocal token_count
             nonlocal last_comma
             nonlocal chunk
 
-            token_count += len(chunk.tokens)
+            if is_last:
+                token_count += len(chunk.tokens)
+            else:
+                token_count += self.chunk_length
+
             to_add = self.chunk_length - len(chunk.tokens)
             if to_add > 0:
                 chunk.tokens += [self.id_end] * to_add
@@ -116,6 +121,10 @@ class FrozenCLIPEmbedderWithCustomWordsBase(torch.nn.Module):
             chunk = PromptChunk()
 
         for tokens, (text, weight) in zip(tokenized, parsed):
+            if text == 'BREAK' and weight == -1:
+                next_chunk()
+                continue
+
             position = 0
             while position < len(tokens):
                 token = tokens[position]
@@ -159,7 +168,7 @@ class FrozenCLIPEmbedderWithCustomWordsBase(torch.nn.Module):
                 position += embedding_length_in_tokens
 
         if len(chunk.tokens) > 0 or len(chunks) == 0:
-            next_chunk()
+            next_chunk(is_last=True)
 
         return chunks, token_count
 
@@ -247,9 +256,9 @@ class FrozenCLIPEmbedderWithCustomWordsBase(torch.nn.Module):
         # restoring original mean is likely not correct, but it seems to work well to prevent artifacts that happen otherwise
         batch_multipliers = torch.asarray(batch_multipliers).to(devices.device)
         original_mean = z.mean()
-        z *= batch_multipliers.reshape(batch_multipliers.shape + (1,)).expand(z.shape)
+        z = z * batch_multipliers.reshape(batch_multipliers.shape + (1,)).expand(z.shape)
         new_mean = z.mean()
-        z *= original_mean / new_mean
+        z = z * (original_mean / new_mean)
 
         return z
 
